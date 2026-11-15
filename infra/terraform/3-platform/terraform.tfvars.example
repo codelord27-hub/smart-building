@@ -1,0 +1,4 @@
+project_id   = "your-project-id"
+state_bucket = "your-project-id-tfstate"
+git_repo_url = "https://github.com/your-github-user/smart-building.git"
+# git_token  = ""   # only needed if the repository is private

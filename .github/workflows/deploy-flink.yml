@@ -1,0 +1,58 @@
+name: deploy-flink
+# Builds the Flink job, uploads the jar to Cloud Storage and (re)submits it to the Dataproc cluster.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "analytics/**"
+      - ".github/workflows/deploy-flink.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-flink
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load CI config
+        run: grep -v '^#' .github/ci-config.env >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+      - name: Build (with unit tests)
+        run: mvn -B -q -f analytics/energy-analytics/pom.xml package
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_CI_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Upload jar
+        run: |
+          JAR="gs://${FLINK_BUCKET}/jars/energy-analytics-${GITHUB_SHA::7}.jar"
+          gcloud storage cp analytics/energy-analytics/target/energy-analytics.jar "$JAR"
+          echo "JAR=$JAR" >> "$GITHUB_ENV"
+      - name: Stop the running version
+        run: |
+          for id in $(gcloud dataproc jobs list --region "$GCP_REGION" --cluster "$DATAPROC_CLUSTER" \
+                        --state-filter=active --filter="labels.app=energy-analytics" --format="value(reference.jobId)"); do
+            echo "killing $id"; gcloud dataproc jobs kill "$id" --region "$GCP_REGION" --quiet
+          done
+      - name: Submit the Flink job
+        run: |
+          gcloud dataproc jobs submit flink \
+            --cluster "$DATAPROC_CLUSTER" --region "$GCP_REGION" \
+            --jar "$JAR" --labels app=energy-analytics,version=${GITHUB_SHA::7} \
+            --max-failures-per-hour 5 --async \
+            -- --bootstrap "$KAFKA_EXTERNAL_BOOTSTRAP" \
+               --input-topics sensor-readings,energy-events \
+               --output-topic energy-analytics-results \
+               --window-seconds 60

@@ -1,0 +1,54 @@
+# Prometheus + Grafana + kube-state-metrics + node-exporter (kube-prometheus-stack)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 87.19.2
+    helm:
+      valuesObject:
+        # control-plane components are managed by Google on GKE and cannot be scraped
+        kubeControllerManager: {enabled: false}
+        kubeScheduler: {enabled: false}
+        kubeEtcd: {enabled: false}
+        kubeProxy: {enabled: false}
+        alertmanager: {enabled: false}
+        prometheus:
+          prometheusSpec:
+            # pick up ServiceMonitors/PodMonitors from every namespace and every label
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            retention: 2d
+            resources:
+              requests: {cpu: 200m, memory: 1Gi}
+        grafana:
+          admin:
+            existingSecret: grafana-admin      # created by Terraform (infra/terraform/platform)
+            userKey: admin-user
+            passwordKey: admin-password
+          service:
+            type: LoadBalancer
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              labelValue: "1"
+              searchNamespace: ALL
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+    retry:
+      limit: 10
+      backoff: {duration: 20s, factor: 2, maxDuration: 5m}

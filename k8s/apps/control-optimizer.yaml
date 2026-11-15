@@ -1,0 +1,74 @@
+# 5. Control Optimizer - feedback control loop + 2PC coordinator (gRPC client), Cloud SQL db "optimizer". HPA on CPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-optimizer
+  labels: {app: control-optimizer, app.kubernetes.io/part-of: smart-building}
+spec:
+  selector:
+    matchLabels: {app: control-optimizer}
+  template:
+    metadata:
+      labels: {app: control-optimizer, app.kubernetes.io/part-of: smart-building}
+    spec:
+      serviceAccountName: sb-app
+      containers:
+        - name: app
+          image: control-optimizer
+          ports: [{name: http, containerPort: 8080}]
+          envFrom:
+            - configMapRef: {name: platform-config}
+            - secretRef: {name: db-credentials}
+          env:
+            - {name: SERVICE_NAME, value: control-optimizer}
+            - {name: DB_NAME, value: optimizer}
+            - {name: REGISTRY_URL, value: "http://building-registry"}
+            - {name: OCCUPANCY_URL, value: "http://occupancy-service"}
+            - {name: HVAC_URL, value: "http://hvac-controller"}
+            - {name: ENERGY_URL, value: "http://energy-monitor"}
+            - {name: HVAC_GRPC, value: "hvac-controller:50051"}
+            - {name: ENERGY_GRPC, value: "energy-monitor:50052"}
+            - {name: CONTROL_INTERVAL_SECONDS, value: "20"}
+            - {name: OUTSIDE_TEMP_C, value: "32"}
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "1", memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-optimizer
+  labels: {app: control-optimizer, app.kubernetes.io/part-of: smart-building}
+spec:
+  selector: {app: control-optimizer}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: control-optimizer
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: control-optimizer}
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 50}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies: [{type: Pods, value: 2, periodSeconds: 15}]
+    scaleDown:
+      stabilizationWindowSeconds: 60
+      policies: [{type: Pods, value: 1, periodSeconds: 30}]

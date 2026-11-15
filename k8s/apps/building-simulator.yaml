@@ -1,0 +1,42 @@
+# Test harness (not one of the 8 services): simulated building physics + sensors -> Sensor Ingestion REST
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: building-simulator
+  labels: {app: building-simulator, app.kubernetes.io/part-of: smart-building}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: building-simulator}
+  template:
+    metadata:
+      labels: {app: building-simulator, app.kubernetes.io/part-of: smart-building}
+    spec:
+      serviceAccountName: sb-app
+      containers:
+        - name: app
+          image: building-simulator
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - {name: SERVICE_NAME, value: building-simulator}
+            - {name: REGISTRY_URL, value: "http://building-registry"}
+            - {name: INGEST_URL, value: "http://sensor-ingestion"}
+            - {name: HVAC_URL, value: "http://hvac-controller"}
+            - {name: SIM_INTERVAL_SECONDS, value: "5"}
+            - {name: OUTSIDE_TEMP_C, value: "32"}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: building-simulator
+  labels: {app: building-simulator, app.kubernetes.io/part-of: smart-building}
+spec:
+  selector: {app: building-simulator}
+  ports: [{name: http, port: 80, targetPort: http}]

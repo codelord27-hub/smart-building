@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Building - HVAC & Energy Control</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2433; --mute:#667085; --line:#e4e7ec; --ok:#12805c; --warn:#b54708; --bad:#b42318; --acc:#2453c9; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 24px; background:#101828; color:#fff; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { margin:0; font-size:18px; font-weight:600; }
+  header span { color:#98a2b3; font-size:12px; }
+  main { padding:20px 24px; display:grid; gap:16px; grid-template-columns: repeat(12, 1fr); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; overflow:auto; }
+  .card h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--mute); }
+  .w12{grid-column:span 12} .w8{grid-column:span 8} .w6{grid-column:span 6} .w4{grid-column:span 4} .w3{grid-column:span 3}
+  @media (max-width: 1000px){ .w8,.w6,.w4,.w3{grid-column:span 12} }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--mute); font-weight:500; }
+  .kpi { font-size:26px; font-weight:600; } .sub { color:var(--mute); font-size:12px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:500; background:#eef2ff; color:var(--acc); }
+  .COMMITTED,.ONLINE,.STABLE { background:#ecfdf3; color:var(--ok); }
+  .ABORTED,.FAULT,.CRITICAL { background:#fef3f2; color:var(--bad); }
+  .MAINTENANCE,.WARNING,.PREPARING,.COMMITTING,.ABORTING,.OSCILLATING { background:#fffaeb; color:var(--warn); }
+  .HEAT { background:#fef3f2; color:var(--bad); } .COOL { background:#eff8ff; color:#175cd3; } .OFF { background:#f2f4f7; color:var(--mute); }
+  form { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  select,input,button { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { background:var(--acc); color:#fff; border-color:var(--acc); cursor:pointer; }
+  button.sec { background:#fff; color:var(--ink); border-color:var(--line); }
+  pre { background:#0b1220; color:#d0d5dd; padding:10px; border-radius:8px; font-size:12px; max-height:220px; overflow:auto; margin:8px 0 0; }
+  .err { color:var(--bad); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Smart Building Management · HVAC &amp; Energy Control</h1>
+  <span id="updated">loading…</span>
+</header>
+<main>
+  <div class="card w3"><h2>Building load</h2><div class="kpi" id="k-load">–</div><div class="sub" id="k-budget"></div></div>
+  <div class="card w3"><h2>Energy today</h2><div class="kpi" id="k-kwh">–</div><div class="sub">kWh (simulated meter)</div></div>
+  <div class="card w3"><h2>Zones</h2><div class="kpi" id="k-zones">–</div><div class="sub" id="k-occ"></div></div>
+  <div class="card w3"><h2>2PC outcomes (recent)</h2><div class="kpi" id="k-txn">–</div><div class="sub" id="k-txn-sub"></div></div>
+
+  <div class="card w12"><h2>Zones · live state</h2>
+    <table><thead><tr><th>Zone</th><th>Name</th><th>Temp °C</th><th>Target</th><th>Limits</th><th>Occupancy</th>
+      <th>HVAC unit</th><th>Mode</th><th>Power</th><th>Load kW</th><th>Status</th><th>Last 1-min window (Flink)</th></tr></thead>
+      <tbody id="zones"></tbody></table>
+    <div id="zones-err" class="err"></div>
+  </div>
+
+  <div class="card w6"><h2>Operator command (Two-Phase Commit)</h2>
+    <form id="cmd">
+      <select id="cmd-zone"></select>
+      <select id="cmd-mode"><option>COOL</option><option>HEAT</option><option>OFF</option></select>
+      <input id="cmd-power" type="number" min="0" max="100" value="60" style="width:80px"> %
+      <select id="cmd-inject"><option value="">no fault</option><option value="crash_before_decision">crash coordinator before decision</option>
+        <option value="crash_after_decision">crash coordinator after COMMIT decision</option></select>
+      <button>Apply</button>
+    </form>
+    <form id="budget"><span class="sub">Energy budget kW</span><input id="budget-kw" type="number" min="1" step="1" style="width:90px"><button class="sec">Set budget</button></form>
+    <form id="unit"><span class="sub">HVAC unit</span><select id="unit-id"></select>
+      <select id="unit-status"><option>ONLINE</option><option>MAINTENANCE</option><option>FAULT</option></select><button class="sec">Set status</button></form>
+    <pre id="cmd-out">Result of the last command appears here.</pre>
+  </div>
+
+  <div class="card w6"><h2>Alerts (Alert Service → Firestore)</h2>
+    <table><thead><tr><th>Time</th><th>Severity</th><th>Type</th><th>Zone</th><th>Message</th></tr></thead><tbody id="alerts"></tbody></table>
+  </div>
+
+  <div class="card w12"><h2>2PC transaction log (coordinator)</h2>
+    <table><thead><tr><th>Txn</th><th>Zone</th><th>Command</th><th>State</th><th>Votes</th><th>Initiator</th><th>Recovered</th><th>Created</th><th>Reason</th></tr></thead>
+      <tbody id="txns"></tbody></table>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pill = (v) => `<span class="pill ${esc(v)}">${esc(v)}</span>`;
+async function j(url, opts) {
+  const r = await fetch(url, opts);
+  const body = await r.text();
+  let data; try { data = JSON.parse(body); } catch { data = body; }
+  if (!r.ok) throw new Error(`${url} → ${r.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
+  return data;
+}
+const safe = (p, d) => p.catch(e => { console.warn(e); return d; });
+const t = (ms) => ms ? new Date(ms).toLocaleTimeString() : "–";
+
+async function refresh() {
+  try {
+    const [zones, occ, units, load, txns, alerts, analytics] = await Promise.all([
+      j("/api/zones"), safe(j("/api/occupancy"), []), safe(j("/api/hvac/units"), []),
+      safe(j("/api/energy/load"), null), safe(j("/api/control/transactions?limit=15"), []),
+      safe(j("/api/alerts?limit=12"), []), safe(j("/api/energy/analytics"), [])]);
+    const O = Object.fromEntries(occ.map(o => [o.zone_id, o]));
+    const U = Object.fromEntries(units.map(u => [u.zone_id, u]));
+    const A = Object.fromEntries(analytics.map(a => [a.zone_id, a]));
+    const L = load ? Object.fromEntries(load.zones.map(z => [z.zone_id, z.kw])) : {};
+    if (!zones.length) { $("zones").innerHTML = `<tr><td colspan="12">No zones yet - <button onclick="seed()">Create demo building</button></td></tr>`; }
+    else $("zones").innerHTML = zones.map(z => {
+      const o = O[z.zone_id] || {}, u = U[z.zone_id] || {}, a = A[z.zone_id];
+      const win = a ? `${t(a.window_start_ms)} · avg ${a.avg_temp_c ?? "–"}°C · ${a.energy_kwh} kWh · ${a.hvac_commands} cmds ${pill(a.control_stability)}` : "–";
+      return `<tr><td>${esc(z.zone_id)}</td><td>${esc(z.name)}</td><td><b>${o.temperature_c ?? "–"}</b></td>
+        <td>${z.target_temp_c}</td><td>${z.min_temp_c}–${z.max_temp_c}</td>
+        <td>${o.occupancy_estimate ?? "–"} ${o.occupied ? "👤" : ""}</td><td>${esc(u.unit_id || "–")}</td>
+        <td>${u.mode ? pill(u.mode) : "–"}</td><td>${u.power_pct ?? "–"}${u.mode ? "%" : ""}</td><td>${(L[z.zone_id] ?? 0).toFixed(1)}</td>
+        <td>${u.status ? pill(u.status) : "–"}${u.locked_by ? " 🔒" : ""}</td><td>${win}</td></tr>`;
+    }).join("");
+    $("zones-err").textContent = "";
+    if (load) {
+      $("k-load").textContent = `${load.total_kw.toFixed(1)} kW`;
+      $("k-budget").textContent = `budget ${load.budget_kw} kW · reserved ${load.reserved_kw} kW · headroom ${load.headroom_kw} kW`;
+      $("k-kwh").textContent = load.kwh_today.toFixed(3);
+      if (document.activeElement !== $("budget-kw")) $("budget-kw").value = load.budget_kw;
+    }
+    $("k-zones").textContent = zones.length;
+    $("k-occ").textContent = `${occ.filter(o => o.occupied).length} occupied`;
+    const c = txns.filter(x => x.state === "COMMITTED").length, ab = txns.filter(x => x.state === "ABORTED").length;
+    $("k-txn").textContent = `${c} ✓ / ${ab} ✗`;
+    $("k-txn-sub").textContent = `last ${txns.length} transactions`;
+    $("txns").innerHTML = txns.map(x => `<tr><td>${esc(x.txn_id)}</td><td>${esc(x.zone_id)}</td>
+      <td>${esc(x.command.mode)} ${x.command.power_pct}% (${x.command.power_kw} kW)</td><td>${pill(x.state)}</td>
+      <td>${Object.entries(x.votes || {}).map(([k, v]) => `${esc(k)}: ${v.yes ? "YES" : "NO"}`).join(", ")}</td>
+      <td>${esc(x.initiator)}</td><td>${x.recovered ? "yes" : ""}</td><td>${new Date(x.created_at).toLocaleTimeString()}</td>
+      <td style="white-space:normal">${esc(x.reason || "")}</td></tr>`).join("");
+    $("alerts").innerHTML = alerts.map(a => `<tr><td>${t(a.ts_ms)}</td><td>${pill(a.severity)}</td><td>${esc(a.type)}</td>
+      <td>${esc(a.zone_id || "")}</td><td style="white-space:normal">${esc(a.message)}</td></tr>`).join("") || `<tr><td colspan="5" class="sub">No alerts</td></tr>`;
+    const zsel = $("cmd-zone"), usel = $("unit-id");
+    if (zsel.options.length !== zones.length) zsel.innerHTML = zones.map(z => `<option>${esc(z.zone_id)}</option>`).join("");
+    if (usel.options.length !== units.length) usel.innerHTML = units.map(u => `<option>${esc(u.unit_id)}</option>`).join("");
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (e) { $("zones-err").textContent = e.message; }
+}
+async function seed() { await j("/api/admin/seed", {method: "POST"}); refresh(); }
+const post = (url, body, method = "POST") => j(url, {method, headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+$("cmd").onsubmit = async (e) => {
+  e.preventDefault(); $("cmd-out").textContent = "running 2PC…";
+  const body = {mode: $("cmd-mode").value, power_pct: +$("cmd-power").value};
+  if ($("cmd-inject").value) body.inject = $("cmd-inject").value;
+  try { $("cmd-out").textContent = JSON.stringify(await post(`/api/control/zones/${$("cmd-zone").value}/command`, body), null, 2); }
+  catch (err) { $("cmd-out").textContent = body.inject ? `Coordinator crashed as requested (${err.message}).\nKubernetes restarts the pod; the recovery process completes the transaction within ~30 s - watch the log below.` : err.message; }
+  refresh();
+};
+$("budget").onsubmit = async (e) => { e.preventDefault();
+  try { $("cmd-out").textContent = JSON.stringify(await post("/api/energy/budget", {budget_kw: +$("budget-kw").value}, "PUT"), null, 2); } catch (err) { $("cmd-out").textContent = err.message; } refresh(); };
+$("unit").onsubmit = async (e) => { e.preventDefault();
+  try { $("cmd-out").textContent = JSON.stringify(await post(`/api/hvac/units/${$("unit-id").value}/status`, {status: $("unit-status").value}, "PUT"), null, 2); } catch (err) { $("cmd-out").textContent = err.message; } refresh(); };
+refresh(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>

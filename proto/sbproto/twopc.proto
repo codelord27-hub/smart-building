@@ -1,0 +1,43 @@
+// Two-Phase Commit (2PC) protocol used by the Control Optimizer (coordinator)
+// to apply an HVAC setpoint change atomically across participants:
+//   * HVAC Controller  - locks the HVAC unit and later applies the command
+//   * Energy Monitor   - reserves energy budget and later commits the new load
+syntax = "proto3";
+
+package sb.twopc.v1;
+
+service Participant {
+  // Phase 1: participant validates and durably records a PREPARED state, then votes.
+  rpc Prepare(PrepareRequest) returns (Vote);
+  // Phase 2 (all voted YES): make the prepared change permanent.
+  rpc Commit(DecisionRequest) returns (Ack);
+  // Phase 2 (any NO / timeout): release everything reserved in Prepare.
+  rpc Abort(DecisionRequest) returns (Ack);
+}
+
+message PrepareRequest {
+  string txn_id = 1;
+  string zone_id = 2;
+  string mode = 3;          // HEAT | COOL | OFF
+  int32 power_pct = 4;      // 0..100
+  double power_kw = 5;      // electrical load the new command will draw
+  int64 requested_at_ms = 6;
+  string coordinator = 7;
+}
+
+message Vote {
+  string txn_id = 1;
+  bool yes = 2;
+  string participant = 3;
+  string reason = 4;
+}
+
+message DecisionRequest {
+  string txn_id = 1;
+}
+
+message Ack {
+  string txn_id = 1;
+  string participant = 2;
+  string state = 3;         // COMMITTED | ABORTED | UNKNOWN
+}

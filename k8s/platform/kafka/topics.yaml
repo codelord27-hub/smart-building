@@ -1,0 +1,30 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: sensor-readings
+  labels: {strimzi.io/cluster: sb-kafka}
+spec:
+  partitions: 3
+  replicas: 1
+  config: {retention.ms: 86400000}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: energy-events
+  labels: {strimzi.io/cluster: sb-kafka}
+spec:
+  partitions: 3
+  replicas: 1
+  config: {retention.ms: 86400000}
+---
+# separate topic for the Flink job's aggregated output
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: energy-analytics-results
+  labels: {strimzi.io/cluster: sb-kafka}
+spec:
+  partitions: 3
+  replicas: 1
+  config: {retention.ms: 86400000}

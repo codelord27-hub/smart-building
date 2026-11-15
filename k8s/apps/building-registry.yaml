@@ -1,0 +1,46 @@
+# 1. Building Registry - REST, public entry point (dashboard at /), Cloud SQL db "registry"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: building-registry
+  labels: {app: building-registry, app.kubernetes.io/part-of: smart-building}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: building-registry}
+  template:
+    metadata:
+      labels: {app: building-registry, app.kubernetes.io/part-of: smart-building}
+    spec:
+      serviceAccountName: sb-app
+      containers:
+        - name: app
+          image: building-registry
+          ports: [{name: http, containerPort: 8080}]
+          envFrom:
+            - configMapRef: {name: platform-config}
+            - secretRef: {name: db-credentials}
+          env:
+            - {name: SERVICE_NAME, value: building-registry}
+            - {name: DB_NAME, value: registry}
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "1", memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: building-registry
+  labels: {app: building-registry, app.kubernetes.io/part-of: smart-building}
+spec:
+  selector: {app: building-registry}
+  ports: [{name: http, port: 80, targetPort: http}]

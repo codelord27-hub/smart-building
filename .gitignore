@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+.venv/
+# generated at build time from proto/sbproto/twopc.proto
+services/common/sbproto/twopc_pb2.py
+services/common/sbproto/twopc_pb2_grpc.py
+analytics/**/target/
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl.bak
+crash.log
+/tmp/
+
+# terraform archive output
+infra/terraform/**/.build/

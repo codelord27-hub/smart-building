@@ -1,0 +1,33 @@
+name: ci
+# Tests on every push / pull request: Python unit tests, Flink unit tests, Docker build check.
+on:
+  push:
+  pull_request:
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r services/requirements.txt pytest functions-framework==3.10.2
+          ./scripts/gen_proto.sh
+          pip install -e services/common
+      - name: Unit tests
+        run: pytest tests/unit -q
+
+  flink-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+      - name: Test and package the Flink job
+        run: mvn -B -q -f analytics/energy-analytics/pom.xml package

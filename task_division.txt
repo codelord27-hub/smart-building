@@ -1,0 +1,13 @@
+Group: S21 - Smart Building Management (HVAC and energy control) - Concept: Two-Phase Commit (2PC)
+Course: CS/SS G527 Cloud Computing - Assignment
+
+ID No.            Name                 Tasks                                                        Services implemented
+----------------  -------------------  -----------------------------------------------------------  ------------------------------------------------
+<ID 1>            <Name 1>             a. Infrastructure as Code (Terraform)                        1. Building Registry
+                                       d. GitOps (ArgoCD, CI image pipeline)                        6. HVAC Controller
+<ID 2>            <Name 2>             b. Serverless function + communication (REST/gRPC/MQ)        5. Control Optimizer (2PC coordinator)
+                                       f. Concept: Two-Phase Commit                                 7. Alert Service (Cloud Function)
+<ID 3>            <Name 3>             c. Managed K8s (GKE), HPA, k6 load test                      2. Sensor Ingestion Service
+                                       g. Storage (Cloud SQL, Firestore, Cloud Storage)             3. Occupancy Service
+<ID 4>            <Name 4>             e. Flink stream processing on Dataproc + Kafka               8. Energy Analytics Service (Flink)
+                                       h. Observability (Prometheus, Grafana, Cloud Logging)        4. Energy Monitor

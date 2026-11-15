@@ -1,0 +1,45 @@
+# 3. Occupancy Service - Kafka consumer -> Firestore zone_state; alerts -> Pub/Sub; REST read API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: occupancy-service
+  labels: {app: occupancy-service, app.kubernetes.io/part-of: smart-building}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: occupancy-service}
+  template:
+    metadata:
+      labels: {app: occupancy-service, app.kubernetes.io/part-of: smart-building}
+    spec:
+      serviceAccountName: sb-app
+      containers:
+        - name: app
+          image: occupancy-service
+          ports: [{name: http, containerPort: 8080}]
+          envFrom:
+            - configMapRef: {name: platform-config}
+          env:
+            - {name: SERVICE_NAME, value: occupancy-service}
+            - {name: REGISTRY_URL, value: "http://building-registry"}
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "1", memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: occupancy-service
+  labels: {app: occupancy-service, app.kubernetes.io/part-of: smart-building}
+spec:
+  selector: {app: occupancy-service}
+  ports: [{name: http, port: 80, targetPort: http}]

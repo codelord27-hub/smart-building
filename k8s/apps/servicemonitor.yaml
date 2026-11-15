@@ -1,0 +1,13 @@
+# Prometheus (kube-prometheus-stack) scrapes /metrics of every Smart Building service.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: smart-building
+  labels: {app.kubernetes.io/part-of: smart-building}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/part-of: smart-building}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

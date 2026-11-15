@@ -1,0 +1,53 @@
+# 4. Energy Monitor - 2PC participant (gRPC :50052), smart-meter events -> Kafka, consumes Flink results -> Firestore
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: energy-monitor
+  labels: {app: energy-monitor, app.kubernetes.io/part-of: smart-building}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: energy-monitor}
+  template:
+    metadata:
+      labels: {app: energy-monitor, app.kubernetes.io/part-of: smart-building}
+    spec:
+      serviceAccountName: sb-app
+      containers:
+        - name: app
+          image: energy-monitor
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: grpc, containerPort: 50052}
+          envFrom:
+            - configMapRef: {name: platform-config}
+            - secretRef: {name: db-credentials}
+          env:
+            - {name: SERVICE_NAME, value: energy-monitor}
+            - {name: DB_NAME, value: energy}
+            - {name: GRPC_PORT, value: "50052"}
+            - {name: ENERGY_BUDGET_KW, value: "45"}
+            - {name: ENERGY_TICK_SECONDS, value: "10"}
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "1", memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: energy-monitor
+  labels: {app: energy-monitor, app.kubernetes.io/part-of: smart-building}
+spec:
+  selector: {app: energy-monitor}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+    - {name: grpc, port: 50052, targetPort: grpc, appProtocol: kubernetes.io/h2c}

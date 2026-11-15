@@ -1,0 +1,11 @@
+# Environment shared by local/run_local.sh and tests/e2e_2pc_local.py
+export GCP_PROJECT=demo-sb
+export PUBSUB_EMULATOR_HOST=127.0.0.1:8085
+export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+export STORAGE_EMULATOR_HOST=http://127.0.0.1:9023
+export KAFKA_BOOTSTRAP=127.0.0.1:9092
+export DB_HOST=127.0.0.1 DB_PORT=5432 DB_USER=sbapp DB_PASSWORD=localpass
+export RAW_BUCKET=sb-raw-local
+export REGISTRY_URL=http://127.0.0.1:8001 INGEST_URL=http://127.0.0.1:8002 OCCUPANCY_URL=http://127.0.0.1:8003
+export ENERGY_URL=http://127.0.0.1:8004 CONTROL_URL=http://127.0.0.1:8005 HVAC_URL=http://127.0.0.1:8006
+export HVAC_GRPC=127.0.0.1:50051 ENERGY_GRPC=127.0.0.1:50052

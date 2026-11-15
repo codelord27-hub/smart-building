@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: smart-building
+
+resources:
+  - building-registry.yaml
+  - sensor-ingestion.yaml
+  - occupancy-service.yaml
+  - energy-monitor.yaml
+  - control-optimizer.yaml
+  - hvac-controller.yaml
+  - building-simulator.yaml
+  - ingress.yaml
+  - servicemonitor.yaml
+
+configMapGenerator:
+  - name: smart-building-dashboard
+    files:
+      - dashboards/smart-building.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+
+# Image names/tags are updated by CI (.github/workflows/build-services.yml -> kustomize edit set image).
+# scripts/configure-repo.sh replaces REGION/PROJECT_ID once before the first push.
+images:
+  - name: building-registry
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/building-registry
+    newTag: latest
+  - name: sensor-ingestion
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/sensor-ingestion
+    newTag: latest
+  - name: occupancy-service
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/occupancy-service
+    newTag: latest
+  - name: energy-monitor
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/energy-monitor
+    newTag: latest
+  - name: control-optimizer
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/control-optimizer
+    newTag: latest
+  - name: hvac-controller
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/hvac-controller
+    newTag: latest
+  - name: building-simulator
+    newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/building-simulator
+    newTag: latest

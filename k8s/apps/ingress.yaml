@@ -1,0 +1,38 @@
+# Public HTTP(S) load balancer (GKE Ingress, class "gce"). Path prefixes route to services;
+# everything else (dashboard at /, /api/buildings, /api/zones, /api/alerts) goes to the Building Registry.
+# Health checks are derived from each pod's readinessProbe (/healthz).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: smart-building
+  annotations:
+    kubernetes.io/ingress.class: gce
+spec:
+  defaultBackend:
+    service:
+      name: building-registry
+      port: {number: 80}
+  rules:
+    - http:
+        paths:
+          - path: /api/readings
+            pathType: Prefix
+            backend: {service: {name: sensor-ingestion, port: {number: 80}}}
+          - path: /api/occupancy
+            pathType: Prefix
+            backend: {service: {name: occupancy-service, port: {number: 80}}}
+          - path: /api/energy
+            pathType: Prefix
+            backend: {service: {name: energy-monitor, port: {number: 80}}}
+          - path: /api/control
+            pathType: Prefix
+            backend: {service: {name: control-optimizer, port: {number: 80}}}
+          - path: /api/hvac
+            pathType: Prefix
+            backend: {service: {name: hvac-controller, port: {number: 80}}}
+          - path: /api/sim
+            pathType: Prefix
+            backend: {service: {name: building-simulator, port: {number: 80}}}
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: building-registry, port: {number: 80}}}
