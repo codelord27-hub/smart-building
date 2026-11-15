@@ -27,22 +27,22 @@ configMapGenerator:
 images:
   - name: building-registry
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/building-registry
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
   - name: sensor-ingestion
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/sensor-ingestion
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
   - name: occupancy-service
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/occupancy-service
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
   - name: energy-monitor
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/energy-monitor
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
   - name: control-optimizer
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/control-optimizer
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
   - name: hvac-controller
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/hvac-controller
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
   - name: building-simulator
     newName: asia-south1-docker.pkg.dev/sb-cc-assignment/smart-building/building-simulator
-    newTag: latest
+    newTag: 1ae09cb40729424fe81455b2c7870f8d01391ce0
