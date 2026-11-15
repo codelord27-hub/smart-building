@@ -44,7 +44,8 @@ jobs:
         run: |
           for id in $(gcloud dataproc jobs list --region "$GCP_REGION" --cluster "$DATAPROC_CLUSTER" \
                         --state-filter=active --filter="labels.app=energy-analytics" --format="value(reference.jobId)"); do
-            echo "killing $id"; gcloud dataproc jobs kill "$id" --region "$GCP_REGION" --quiet
+            echo "killing $id"
+            gcloud dataproc jobs kill "$id" --region "$GCP_REGION" --quiet || echo "job $id is not running, skipped"
           done
       - name: Submit the Flink job
         run: |
